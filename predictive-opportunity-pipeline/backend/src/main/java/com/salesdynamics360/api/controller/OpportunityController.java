@@ -50,6 +50,28 @@ public class OpportunityController {
         }).collect(Collectors.toList());
     }
 
+    @GetMapping("/{id}")
+    public Map<String, Object> getById(@PathVariable String id) {
+        Opportunity opp = service.getAll().stream()
+                .filter(o -> o.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Opportunity not found"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> map = objectMapper.convertValue(opp, Map.class);
+
+        if (opp.getClientId() != null) {
+            Client client = clientRepository.findById(opp.getClientId()).orElse(null);
+            if (client != null) {
+                map.put("clientName", client.getName());
+                map.put("clientAvatar", client.getAvatar());
+                map.put("clientAddress", client.getAddress());
+                map.put("clientRiskTolerance", client.getRiskTolerance());
+                map.put("clientHealth", client.getHealth());
+            }
+        }
+        return map;
+    }
     /**
      * Accepts the raw JSON from the frontend, extracts only the safe fields,
      * and delegates to OpportunityService.update().

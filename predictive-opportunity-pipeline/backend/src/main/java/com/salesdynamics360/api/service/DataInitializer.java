@@ -297,8 +297,27 @@ public class DataInitializer {
                 "estimatedCloseDate", "2025-05-20"
         )));
 
+        Opportunity oppAI = new Opportunity();
+        oppAI.setClientId("C1005");
+        oppAI.setType(OpportunityType.SALES);
+        oppAI.setTitle("Swiss Regional Relocation");
+        oppAI.setOwnerAlias("AI");
+        oppAI.setStage(Stage.QUALIFY);
+        oppAI.setPriority("HIGH");
+        oppAI.setDate("MAY 04, 2026");
+        oppAI.setDynamicFields(new HashMap<>(Map.of(
+                "accountName", "AI Test Account",
+                "value", "1000000",
+                "estimatedCloseDate", "2026-12-31"
+        )));
+        oppAI.setActivities(new ArrayList<>(Arrays.asList(
+                new Activity(null, "CALL", "Initial prospect call. We introduced our wealth management services in High German. The client responded positively but mentioned they prefer regional communication nuances.", "2026-05-01"),
+                new Activity(null, "MEETING", "Follow-up meeting in Zurich. The client exclusively spoke in Swiss German during the technical deep-dive. They indicated strong interest in our structured products but noted a preference for localized relationship management.", "2026-05-02"),
+                new Activity(null, "EMAIL", "Client sent an email confirming their upcoming relocation. They are officially moving their primary residence and operations out of Zurich to Geneva next quarter, requesting a review of regional tax implications.", "2026-05-03")
+        )));
+
         // Save through OpportunityService so the heuristic scoring engine runs on each
-        for (Opportunity opp : Arrays.asList(opp1, opp2, opp3, opp4, opp5, opp6, opp7, opp8, opp9, opp10)) {
+        for (Opportunity opp : Arrays.asList(opp1, opp2, opp3, opp4, opp5, opp6, opp7, opp8, opp9, opp10, oppAI)) {
             opportunityService.save(opp);
         }
     }
