@@ -21,6 +21,7 @@ public class OpportunityService {
     }
 
     public Opportunity save(Opportunity opportunity) {
+        calculateScore(opportunity);
         return repository.save(opportunity);
     }
 
@@ -49,7 +50,46 @@ public class OpportunityService {
             existing.getDynamicFields().putAll(updates.getDynamicFields());
         }
 
+        calculateScore(existing);
         return repository.save(existing);
+    }
+
+    private void calculateScore(Opportunity opp) {
+        int score = 50; // Baseline
+
+        // 1. Activity (max +20)
+        if (opp.getActivities() != null) {
+            score += Math.min(opp.getActivities().size() * 5, 20);
+        }
+
+        // 2. Priority (max +15)
+        if ("HIGH".equals(opp.getPriority())) score += 10;
+        else if ("WINNING".equals(opp.getPriority())) score += 15;
+        else if ("LOW".equals(opp.getPriority())) score -= 10;
+
+        // 3. System Signals (max +15)
+        int sentiment = (opp.getMarketSentimentScore() != null ? opp.getMarketSentimentScore() : 50) - 50;
+        score += (int) Math.floor(sentiment * 0.2);
+
+        int risk = (opp.getRiskScore() != null ? opp.getRiskScore() : 30);
+        score -= (int) Math.floor(risk * 0.1);
+
+        // 4. Value (max +10)
+        String valueStr = opp.getDynamicFields().get("value");
+        if (valueStr != null) {
+            try {
+                long val = Long.parseLong(valueStr.replaceAll("[^\\d]", ""));
+                if (val > 100000) score += 10;
+            } catch (Exception ignored) {}
+        }
+
+        int finalScore = Math.max(0, Math.min(100, score));
+        opp.setScore(finalScore);
+        
+        if (finalScore >= 75) opp.setGrade("A");
+        else if (finalScore >= 50) opp.setGrade("B");
+        else if (finalScore >= 25) opp.setGrade("C");
+        else opp.setGrade("D");
     }
 
     private void validateTransition(OpportunityType type, Stage current, Stage next) {

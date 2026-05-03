@@ -41,6 +41,13 @@ public class Opportunity {
     @ElementCollection
     private Map<String, String> dynamicFields = new HashMap<>();
 
+    // Predictive Scoring
+    private Integer score = 50;
+    private String grade = "B";
+    private Integer marketSentimentScore = 50;
+    private Integer riskScore = 30;
+    private String recommendation = "Awaiting analysis...";
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
