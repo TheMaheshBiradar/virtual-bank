@@ -1,15 +1,10 @@
 package com.salesdynamics360.api.model;
 
 import jakarta.persistence.*;
-import lombok.*;
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Entity
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class Opportunity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -48,6 +43,8 @@ public class Opportunity {
     private Integer riskScore = 30;
     private String recommendation = "Awaiting analysis...";
 
+    public Opportunity() {}
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -58,4 +55,40 @@ public class Opportunity {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    // Getters and Setters
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public OpportunityType getType() { return type; }
+    public void setType(OpportunityType type) { this.type = type; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public Stage getStage() { return stage; }
+    public void setStage(Stage stage) { this.stage = stage; }
+    public String getOwnerAlias() { return ownerAlias; }
+    public void setOwnerAlias(String ownerAlias) { this.ownerAlias = ownerAlias; }
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
+    public String getDate() { return date; }
+    public void setDate(String date) { this.date = date; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public List<Activity> getActivities() { return activities; }
+    public void setActivities(List<Activity> activities) { this.activities = activities; }
+    public List<HistoryEntry> getHistory() { return history; }
+    public void setHistory(List<HistoryEntry> history) { this.history = history; }
+    public Map<String, String> getDynamicFields() { return dynamicFields; }
+    public void setDynamicFields(Map<String, String> dynamicFields) { this.dynamicFields = dynamicFields; }
+    public Integer getScore() { return score; }
+    public void setScore(Integer score) { this.score = score; }
+    public String getGrade() { return grade; }
+    public void setGrade(String grade) { this.grade = grade; }
+    public Integer getMarketSentimentScore() { return marketSentimentScore; }
+    public void setMarketSentimentScore(Integer marketSentimentScore) { this.marketSentimentScore = marketSentimentScore; }
+    public Integer getRiskScore() { return riskScore; }
+    public void setRiskScore(Integer riskScore) { this.riskScore = riskScore; }
+    public String getRecommendation() { return recommendation; }
+    public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
 }
