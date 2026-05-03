@@ -29,26 +29,40 @@ public class OpportunityService {
         Opportunity existing = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Opportunity not found"));
 
+        // Stage transition with validation
         if (updates.getStage() != null && updates.getStage() != existing.getStage()) {
             validateTransition(existing.getType(), existing.getStage(), updates.getStage());
-            
-            // Record History
+
+            // Record server-side history for transitions
             HistoryEntry entry = new HistoryEntry();
             entry.setType("STATUS_CHANGE");
             entry.setDescription("Stage changed from " + existing.getStage() + " to " + updates.getStage());
-            entry.setUser("System"); 
+            entry.setUser("System");
             entry.setDate(new Date().toString());
             existing.getHistory().add(entry);
         }
 
-        // Apply updates
+        // Apply simple field updates
         if (updates.getStage() != null) existing.setStage(updates.getStage());
         if (updates.getTitle() != null) existing.setTitle(updates.getTitle());
         if (updates.getOwnerAlias() != null) existing.setOwnerAlias(updates.getOwnerAlias());
         if (updates.getPriority() != null) existing.setPriority(updates.getPriority());
         if (updates.getClientId() != null) existing.setClientId(updates.getClientId());
-        if (updates.getDynamicFields() != null) {
+        if (updates.getDate() != null) existing.setDate(updates.getDate());
+        if (updates.getType() != null) existing.setType(updates.getType());
+
+        // Merge dynamic fields (don't replace, merge)
+        if (updates.getDynamicFields() != null && !updates.getDynamicFields().isEmpty()) {
             existing.getDynamicFields().putAll(updates.getDynamicFields());
+        }
+
+        // Merge activities: only add genuinely new ones (those with null id)
+        if (updates.getActivities() != null) {
+            for (Activity incoming : updates.getActivities()) {
+                if (incoming.getId() == null) {
+                    existing.getActivities().add(incoming);
+                }
+            }
         }
 
         calculateScore(existing);
@@ -76,7 +90,7 @@ public class OpportunityService {
         score -= (int) Math.floor(risk * 0.1);
 
         // 4. Value (max +10)
-        String valueStr = opp.getDynamicFields().get("value");
+        String valueStr = opp.getDynamicFields() != null ? opp.getDynamicFields().get("value") : null;
         if (valueStr != null) {
             try {
                 long val = Long.parseLong(valueStr.replaceAll("[^\\d]", ""));
@@ -100,7 +114,10 @@ public class OpportunityService {
             if (allowed != null && !allowed.isEmpty()) {
                 List<String> allowedList = Arrays.asList(allowed.split(","));
                 if (!allowedList.contains(next.name())) {
-                    throw new IllegalStateException("Invalid transition: " + current + " -> " + next);
+                    throw new IllegalStateException(
+                        "Invalid transition: " + current + " -> " + next +
+                        ". Allowed: " + allowedList
+                    );
                 }
             }
         }

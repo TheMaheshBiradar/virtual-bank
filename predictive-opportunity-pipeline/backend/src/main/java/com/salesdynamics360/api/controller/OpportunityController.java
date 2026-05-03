@@ -50,14 +50,74 @@ public class OpportunityController {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Accepts the raw JSON from the frontend, extracts only the safe fields,
+     * and delegates to OpportunityService.update().
+     * This avoids Jackson deserialization errors when the frontend sends
+     * history/activity entries with string IDs (backend expects Long).
+     */
+    @PutMapping("/{id}")
+    public Map<String, Object> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        Opportunity updates = new Opportunity();
+
+        // Extract safe primitive fields
+        if (body.containsKey("stage")) updates.setStage(com.salesdynamics360.api.model.Stage.valueOf((String) body.get("stage")));
+        if (body.containsKey("title")) updates.setTitle((String) body.get("title"));
+        if (body.containsKey("ownerAlias")) updates.setOwnerAlias((String) body.get("ownerAlias"));
+        if (body.containsKey("priority")) updates.setPriority((String) body.get("priority"));
+        if (body.containsKey("date")) updates.setDate((String) body.get("date"));
+        if (body.containsKey("clientId")) updates.setClientId((String) body.get("clientId"));
+        if (body.containsKey("type")) updates.setType(com.salesdynamics360.api.model.OpportunityType.valueOf((String) body.get("type")));
+
+        // Extract dynamicFields map
+        if (body.containsKey("dynamicFields") && body.get("dynamicFields") instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, String> df = (Map<String, String>) body.get("dynamicFields");
+            updates.setDynamicFields(df);
+        }
+
+        // Extract activities — only new ones (those without a numeric id)
+        if (body.containsKey("activities") && body.get("activities") instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rawActivities = (List<Map<String, Object>>) body.get("activities");
+            List<com.salesdynamics360.api.model.Activity> newActivities = new ArrayList<>();
+            for (Map<String, Object> a : rawActivities) {
+                Object aid = a.get("id");
+                // Only include new activities (null id or non-numeric string id from frontend)
+                if (aid == null || (aid instanceof String && !((String) aid).matches("\\d+"))) {
+                    com.salesdynamics360.api.model.Activity activity = new com.salesdynamics360.api.model.Activity();
+                    activity.setType((String) a.get("type"));
+                    activity.setNotes((String) a.get("notes"));
+                    activity.setDate((String) a.get("date"));
+                    newActivities.add(activity);
+                }
+            }
+            if (!newActivities.isEmpty()) {
+                updates.setActivities(newActivities);
+            }
+        }
+
+        // Let service handle the update (it manages history server-side)
+        Opportunity saved = service.update(id, updates);
+
+        // Return enriched response
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = objectMapper.convertValue(saved, Map.class);
+        if (saved.getClientId() != null) {
+            clientRepository.findById(saved.getClientId()).ifPresent(client -> {
+                result.put("clientName", client.getName());
+                result.put("clientAvatar", client.getAvatar());
+                result.put("clientAddress", client.getAddress());
+                result.put("clientRiskTolerance", client.getRiskTolerance());
+                result.put("clientHealth", client.getHealth());
+            });
+        }
+        return result;
+    }
+
     @PostMapping
     public Opportunity create(@RequestBody Opportunity opportunity) {
         return service.save(opportunity);
-    }
-
-    @PutMapping("/{id}")
-    public Opportunity update(@PathVariable String id, @RequestBody Opportunity opportunity) {
-        return service.update(id, opportunity);
     }
 
     @DeleteMapping("/{id}")
