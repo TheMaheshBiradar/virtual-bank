@@ -2,6 +2,10 @@ package com.salesdynamics360.api.controller;
 
 import com.salesdynamics360.api.model.Opportunity;
 import com.salesdynamics360.api.repository.OpportunityRepository;
+import com.salesdynamics360.api.service.ai.AiProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -11,15 +15,27 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class AiController {
 
+    private static final Logger log = LoggerFactory.getLogger(AiController.class);
+
+    private final AiProvider aiProvider;
     private final OpportunityRepository opportunityRepository;
 
-    public AiController(OpportunityRepository opportunityRepository) {
+    public AiController(@Qualifier("activeAiProvider") AiProvider aiProvider,
+                         OpportunityRepository opportunityRepository) {
+        this.aiProvider = aiProvider;
         this.opportunityRepository = opportunityRepository;
     }
 
     /**
-     * Summarizes activities for a specific opportunity.
-     * POST /api/ai/summarize
+     * GET /api/ai/status — returns current provider info
+     */
+    @GetMapping("/status")
+    public Map<String, String> status() {
+        return Map.of("provider", aiProvider.getProviderName());
+    }
+
+    /**
+     * POST /api/ai/summarize — activity intelligence summary
      */
     @PostMapping("/summarize")
     public Map<String, String> summarizeActivities(@RequestBody Map<String, Object> request) {
@@ -30,10 +46,104 @@ public class AiController {
         String clientAddress = (String) request.get("clientAddress");
         String employeeAddress = (String) request.get("employeeAddress");
 
+        // Try AI provider first, fall back to heuristic
+        try {
+            String activityLog = activities.stream()
+                    .map(a -> "[" + a.getOrDefault("date", "") + "] " + a.getOrDefault("type", "") + ": " + a.getOrDefault("notes", ""))
+                    .collect(Collectors.joining("\n"));
+
+            String systemPrompt = "You are a professional sales analyst at a top-tier Swiss investment bank. " +
+                    "Provide brief, bulleted summaries. Maximum 4-5 bullets. Use professional, data-driven language. " +
+                    "If proximity information between client and employee is provided, integrate it naturally.";
+
+            StringBuilder userPrompt = new StringBuilder();
+            userPrompt.append("Analyze the following sales activities for a client with a ")
+                    .append(riskTolerance).append(" risk tolerance and a current relationship health of ").append(health).append(".\n\n");
+            userPrompt.append("Activity Log:\n").append(activityLog).append("\n\n");
+            userPrompt.append("Provide a highly actionable executive summary. Your recommendations MUST:\n");
+            userPrompt.append("1. Align with the client's ").append(riskTolerance).append(" risk profile.\n");
+            userPrompt.append("2. Address any red flags indicated by the ").append(health).append(" relationship health.\n");
+            userPrompt.append("3. Quantify momentum or identify specific friction points.\n");
+            userPrompt.append("4. Suggest 2-3 concrete \"Next Best Actions\".\n");
+
+            if (clientAddress != null && employeeAddress != null && !clientAddress.isEmpty() && !employeeAddress.isEmpty()) {
+                userPrompt.append("\nGeographic Context: The client is at \"").append(clientAddress)
+                        .append("\" and the representative is at \"").append(employeeAddress)
+                        .append("\". If they are within 30km, prioritize a face-to-face meeting.\n");
+            }
+
+            String result = aiProvider.generate(systemPrompt, userPrompt.toString());
+            log.info("Activity summary generated via {}", aiProvider.getProviderName());
+            return Map.of("summary", result, "provider", aiProvider.getProviderName());
+
+        } catch (Exception e) {
+            log.info("AI provider unavailable ({}), using heuristic engine", e.getMessage());
+            return Map.of("summary", buildHeuristicActivitySummary(activities, riskTolerance, health, clientAddress, employeeAddress),
+                          "provider", "Heuristic (local)");
+        }
+    }
+
+    /**
+     * POST /api/ai/insights — strategic pipeline intelligence
+     */
+    @PostMapping("/insights")
+    public Map<String, String> generateInsights(@RequestBody(required = false) Map<String, Object> request) {
+        List<Opportunity> opportunities = opportunityRepository.findAll();
+
+        if (opportunities.isEmpty()) {
+            return Map.of("summary", "No opportunities in pipeline. Begin prospecting to build deal flow.",
+                          "provider", "N/A");
+        }
+
+        // Try AI provider first, fall back to heuristic
+        try {
+            String pipelineData = opportunities.stream().map(o -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("title", o.getTitle());
+                m.put("stage", o.getStage());
+                m.put("type", o.getType());
+                m.put("priority", o.getPriority());
+                m.put("score", o.getScore());
+                m.put("grade", o.getGrade());
+                if (o.getDynamicFields() != null && o.getDynamicFields().containsKey("value")) {
+                    m.put("value", o.getDynamicFields().get("value"));
+                }
+                return m.toString();
+            }).collect(Collectors.joining("\n"));
+
+            String systemPrompt = "You are a Chief Sales Officer at a top-tier Swiss investment bank. " +
+                    "Your insights must be data-driven, strategic, and concise. Use banking-grade terminology. " +
+                    "Provide 4-5 high-impact bullets.";
+
+            String userPrompt = "Review the following sales pipeline and identify high-leverage strategic opportunities:\n\n" +
+                    pipelineData + "\n\n" +
+                    "Focus on:\n" +
+                    "- Capital Concentration: Are we over-indexed on a specific segment?\n" +
+                    "- Relationship Friction: Identify stages where deal-flow is hitting a systemic bottleneck.\n" +
+                    "- Strategic Priority: Which deals should receive senior management attention this week?\n" +
+                    "- Growth Forecast: Brief assessment of overall pipeline quality vs. quantity.\n" +
+                    "- Actionable next steps for the week.";
+
+            String result = aiProvider.generate(systemPrompt, userPrompt);
+            log.info("Pipeline insights generated via {}", aiProvider.getProviderName());
+            return Map.of("summary", result, "provider", aiProvider.getProviderName());
+
+        } catch (Exception e) {
+            log.info("AI provider unavailable ({}), using heuristic engine", e.getMessage());
+            return Map.of("summary", buildHeuristicPipelineInsights(opportunities),
+                          "provider", "Heuristic (local)");
+        }
+    }
+
+    // ───────────────────────────────────────────────────────────
+    // Heuristic Fallback Engines
+    // ───────────────────────────────────────────────────────────
+
+    private String buildHeuristicActivitySummary(List<Map<String, String>> activities, String riskTolerance,
+                                                  String health, String clientAddress, String employeeAddress) {
         StringBuilder sb = new StringBuilder();
         sb.append("**Activity Intelligence Summary**\n\n");
 
-        // 1. Engagement volume
         int total = activities.size();
         Map<String, Long> typeCounts = activities.stream()
                 .collect(Collectors.groupingBy(a -> a.getOrDefault("type", "OTHER"), Collectors.counting()));
@@ -41,11 +151,10 @@ public class AiController {
         sb.append("- **Engagement Velocity:** ").append(total).append(" recorded touchpoint");
         if (total != 1) sb.append("s");
         sb.append(". ");
-        if (total >= 4) sb.append("High-frequency engagement pattern detected — strong relationship momentum.\n");
+        if (total >= 4) sb.append("High-frequency engagement pattern — strong relationship momentum.\n");
         else if (total >= 2) sb.append("Moderate cadence — recommend increasing touchpoint frequency.\n");
-        else sb.append("Low engagement. Immediate outreach recommended to re-establish momentum.\n");
+        else sb.append("Low engagement. Immediate outreach recommended.\n");
 
-        // 2. Channel mix
         if (!typeCounts.isEmpty()) {
             List<String> channels = new ArrayList<>();
             typeCounts.forEach((type, count) -> channels.add(count + " " + type.toLowerCase() + "(s)"));
@@ -53,71 +162,49 @@ public class AiController {
             if (typeCounts.containsKey("MEETING")) {
                 sb.append(" Face-to-face engagement present — high-conviction signal.\n");
             } else {
-                sb.append(" No in-person meetings logged — consider scheduling a discovery session.\n");
+                sb.append(" No in-person meetings — consider scheduling a discovery session.\n");
             }
         }
 
-        // 3. Recency
         String latestDate = activities.stream()
                 .map(a -> a.getOrDefault("date", ""))
                 .filter(d -> !d.isEmpty())
-                .max(String::compareTo)
-                .orElse(null);
+                .max(String::compareTo).orElse(null);
         if (latestDate != null) {
             sb.append("- **Last Activity:** ").append(latestDate).append(".\n");
         }
 
-        // 4. Risk-aligned recommendation
-        sb.append("- **Risk Profile Alignment:** Client is ").append(riskTolerance).append(" risk tolerance");
+        sb.append("- **Risk Profile:** Client is ").append(riskTolerance).append(" risk tolerance");
         sb.append(" with ").append(health).append(" relationship health. ");
-        if ("AT_RISK".equals(health) || "AGGRESSIVE".equals(riskTolerance)) {
-            sb.append("**Action Required:** Prioritize a senior-level touchpoint within 48 hours.\n");
+        if ("AT_RISK".equals(health)) {
+            sb.append("**Action Required:** Senior-level touchpoint within 48 hours.\n");
         } else if ("HEALTHY".equals(health)) {
-            sb.append("Maintain current cadence; explore cross-sell opportunities.\n");
+            sb.append("Maintain cadence; explore cross-sell.\n");
         } else {
-            sb.append("Schedule a check-in within the next 7 business days.\n");
+            sb.append("Schedule check-in within 7 business days.\n");
         }
 
-        // 5. Proximity
-        if (clientAddress != null && employeeAddress != null && !clientAddress.isEmpty() && !employeeAddress.isEmpty()) {
-            // Simple Swiss canton proximity heuristic
+        if (clientAddress != null && employeeAddress != null) {
             String clientCity = extractCity(clientAddress);
             String empCity = extractCity(employeeAddress);
             if (clientCity != null && clientCity.equalsIgnoreCase(empCity)) {
-                sb.append("- **Proximity Signal:** Client and representative are in the same city (").append(clientCity).append("). ");
-                sb.append("Strongly recommend a face-to-face \"Swiss Touch\" meeting for maximum impact.\n");
+                sb.append("- **Proximity Signal:** Same city (").append(clientCity).append(") — face-to-face meeting recommended.\n");
             }
         }
 
-        // 6. Next Best Actions
         sb.append("\n**Next Best Actions:**\n");
         if (!typeCounts.containsKey("MEETING") || typeCounts.getOrDefault("MEETING", 0L) < 2) {
-            sb.append("1. Schedule in-person discovery or portfolio review session.\n");
+            sb.append("1. Schedule in-person portfolio review session.\n");
         } else {
-            sb.append("1. Prepare formal proposal deck incorporating latest client feedback.\n");
+            sb.append("1. Prepare formal proposal incorporating latest feedback.\n");
         }
-        if ("AT_RISK".equals(health)) {
-            sb.append("2. Escalate to relationship manager for immediate retention strategy.\n");
-        } else {
-            sb.append("2. Send personalized market update aligned with client's risk profile.\n");
-        }
-        sb.append("3. Log follow-up task for next week to maintain engagement cadence.\n");
+        sb.append("2. Send personalized market update aligned with risk profile.\n");
+        sb.append("3. Log follow-up task for next week.\n");
 
-        return Map.of("summary", sb.toString());
+        return sb.toString();
     }
 
-    /**
-     * Generates strategic pipeline insights.
-     * POST /api/ai/insights
-     */
-    @PostMapping("/insights")
-    public Map<String, String> generateInsights(@RequestBody(required = false) Map<String, Object> request) {
-        List<Opportunity> opportunities = opportunityRepository.findAll();
-
-        if (opportunities.isEmpty()) {
-            return Map.of("summary", "No opportunities in pipeline. Begin prospecting to build deal flow.");
-        }
-
+    private String buildHeuristicPipelineInsights(List<Opportunity> opportunities) {
         StringBuilder sb = new StringBuilder();
         sb.append("**Pipeline Strategic Intelligence**\n\n");
 
@@ -127,29 +214,23 @@ public class AiController {
         Map<String, Long> byType = opportunities.stream()
                 .collect(Collectors.groupingBy(o -> o.getType() != null ? o.getType().name() : "UNKNOWN", Collectors.counting()));
 
-        // 1. Pipeline composition
         sb.append("- **Pipeline Scale:** ").append(total).append(" active opportunities across ");
         sb.append(byType.size()).append(" deal categories. ");
         long salesCount = byType.getOrDefault("SALES", 0L);
         if (salesCount > total * 0.6) {
-            sb.append("⚠️ Revenue pipeline is over-indexed on direct sales — consider diversifying.\n");
+            sb.append("⚠️ Over-indexed on direct sales.\n");
         } else {
-            sb.append("Healthy category diversification observed.\n");
+            sb.append("Healthy diversification.\n");
         }
 
-        // 2. Stage velocity
-        long qualifyCount = byStage.getOrDefault("QUALIFY", 0L);
-        long closeCount = byStage.getOrDefault("CLOSE", 0L);
-        long proposeCount = byStage.getOrDefault("PROPOSE", 0L);
         sb.append("- **Stage Distribution:** ");
         byStage.forEach((stage, count) -> sb.append(stage).append(": ").append(count).append("  "));
         sb.append("\n");
+        long qualifyCount = byStage.getOrDefault("QUALIFY", 0L);
         if (qualifyCount > total * 0.5) {
-            sb.append("  ⚠️ **Bottleneck Detected:** Over 50% of deals remain in QUALIFY. ");
-            sb.append("Recommend accelerating qualification criteria and discarding low-conviction leads.\n");
+            sb.append("  ⚠️ **Bottleneck:** Over 50% in QUALIFY — accelerate qualification.\n");
         }
 
-        // 3. Revenue concentration
         long totalValue = 0;
         int valuedDeals = 0;
         for (Opportunity opp : opportunities) {
@@ -161,55 +242,47 @@ public class AiController {
             }
         }
         if (valuedDeals > 0) {
-            sb.append("- **Revenue Forecast:** $").append(String.format("%,.0f", (double) totalValue));
-            sb.append(" in weighted pipeline across ").append(valuedDeals).append(" revenue opportunities. ");
-            sb.append("Average deal size: $").append(String.format("%,.0f", (double) totalValue / valuedDeals)).append(".\n");
+            sb.append("- **Revenue Forecast:** $").append(String.format("%,d", totalValue));
+            sb.append(" across ").append(valuedDeals).append(" deals. Avg: $").append(String.format("%,d", totalValue / valuedDeals)).append(".\n");
         }
 
-        // 4. Priority deals
         long highPriority = opportunities.stream()
-                .filter(o -> "HIGH".equals(o.getPriority()) || "WINNING".equals(o.getPriority()))
-                .count();
-        sb.append("- **Strategic Focus:** ").append(highPriority).append(" of ").append(total);
-        sb.append(" deals flagged as high-priority or winning. ");
-        if (highPriority == total) {
-            sb.append("Every deal is elevated — consider re-calibrating priority tiers for better resource allocation.\n");
-        } else if (closeCount > 0) {
-            sb.append(closeCount).append(" deal(s) in CLOSE stage requiring immediate senior attention.\n");
+                .filter(o -> "HIGH".equals(o.getPriority()) || "WINNING".equals(o.getPriority())).count();
+        sb.append("- **Strategic Focus:** ").append(highPriority).append("/").append(total).append(" high-priority. ");
+        long closeCount = byStage.getOrDefault("CLOSE", 0L);
+        if (closeCount > 0) {
+            sb.append(closeCount).append(" in CLOSE stage.\n");
+        } else {
+            sb.append("No deals in CLOSE — push top PROPOSE deals forward.\n");
         }
 
-        // 5. Scoring health
         double avgScore = opportunities.stream()
-                .mapToInt(o -> o.getScore() != null ? o.getScore() : 50)
-                .average().orElse(50);
+                .mapToInt(o -> o.getScore() != null ? o.getScore() : 50).average().orElse(50);
         long gradeA = opportunities.stream().filter(o -> "A".equals(o.getGrade())).count();
-        sb.append("- **Health Score:** Pipeline average is **").append(String.format("%.0f", avgScore)).append("/100** ");
-        sb.append("with ").append(gradeA).append(" Grade-A opportunities. ");
-        if (avgScore >= 70) sb.append("Strong pipeline quality.\n");
-        else if (avgScore >= 50) sb.append("Moderate quality — focus on upgrading B-grade deals.\n");
-        else sb.append("⚠️ Below-average quality. Immediate pipeline review recommended.\n");
+        sb.append("- **Health Score:** Pipeline avg **").append(String.format("%.0f", avgScore)).append("/100** ");
+        sb.append("with ").append(gradeA).append(" Grade-A. ");
+        if (avgScore >= 70) sb.append("Strong quality.\n");
+        else if (avgScore >= 50) sb.append("Moderate — focus on upgrading B-grade deals.\n");
+        else sb.append("⚠️ Below-average. Immediate review recommended.\n");
 
-        // 6. Actionable recommendations
+        long proposeCount = byStage.getOrDefault("PROPOSE", 0L);
         sb.append("\n**Weekly Priorities:**\n");
         if (proposeCount > 0) {
-            sb.append("1. Accelerate ").append(proposeCount).append(" PROPOSE-stage deal(s) toward close.\n");
+            sb.append("1. Accelerate ").append(proposeCount).append(" PROPOSE deal(s) toward close.\n");
         } else {
             sb.append("1. Push top DEVELOP deals into PROPOSE with formal proposals.\n");
         }
-        sb.append("2. Review and discard stalled QUALIFY opportunities to improve conversion metrics.\n");
-        sb.append("3. Schedule leadership pipeline review to align resource allocation.\n");
+        sb.append("2. Review stalled QUALIFY opportunities.\n");
+        sb.append("3. Schedule leadership pipeline review.\n");
 
-        return Map.of("summary", sb.toString());
+        return sb.toString();
     }
 
     private String extractCity(String address) {
         if (address == null) return null;
-        // Pattern: "Street, POSTCODE City" — extract the city after the postcode
         String[] parts = address.split(",");
         if (parts.length >= 2) {
-            String cityPart = parts[parts.length - 1].trim();
-            // Remove postcode digits
-            return cityPart.replaceAll("^\\d+\\s*", "").trim();
+            return parts[parts.length - 1].trim().replaceAll("^\\d+\\s*", "").trim();
         }
         return null;
     }
