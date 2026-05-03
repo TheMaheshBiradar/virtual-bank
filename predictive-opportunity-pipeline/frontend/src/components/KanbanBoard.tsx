@@ -115,10 +115,25 @@ export default function KanbanBoard({ targetOpportunityId, onClearTarget }: Kanb
   };
 
   const preparePayload = (data: any) => {
-    const { id, type, title, stage, ownerAlias, priority, date, activities, history, clientId, ...rest } = data;
+    // Destructure all known top-level fields (including read-only backend fields)
+    const { 
+      id, type, title, stage, ownerAlias, priority, date, activities, history, clientId,
+      dynamicFields,
+      // Read-only fields that should NOT go into dynamicFields:
+      createdAt, updatedAt, score, grade, marketSentimentScore, riskScore, recommendation,
+      clientName, clientAvatar, clientAddress, clientRiskTolerance, clientHealth,
+      ...rest 
+    } = data;
+    
+    // Convert all values in rest to strings to satisfy Map<String, String> in Java backend
+    const stringifiedRest: Record<string, string> = {};
+    Object.keys(rest).forEach(key => {
+      stringifiedRest[key] = rest[key] != null ? String(rest[key]) : '';
+    });
+
     return {
       id, type, title, stage, ownerAlias, priority, date, activities, history, clientId,
-      dynamicFields: rest
+      dynamicFields: { ...(dynamicFields || {}), ...stringifiedRest }
     };
   };
 
