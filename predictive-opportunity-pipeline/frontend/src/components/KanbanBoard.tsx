@@ -277,22 +277,27 @@ export default function KanbanBoard({ targetOpportunityId, onClearTarget }: Kanb
           const err = await res.json();
           setOpportunities(prevOpps); // Revert card position
 
-          // Parse allowed stages from the error message if available,
-          // then show the rich TransitionBlockedModal
-          const allowedMatch = err.error?.match(/Allowed: \[([^\]]*)\]/);
-          const allowedStages = allowedMatch && allowedMatch[1]
-            ? allowedMatch[1].split(', ').filter(Boolean)
-            : [];
+          if (err.type === 'VALIDATION_ERROR' || (err.error && err.error.includes('Invalid transition'))) {
+            // Parse allowed stages from the error message if available,
+            // then show the rich TransitionBlockedModal
+            const allowedMatch = err.error?.match(/Allowed: \[([^\]]*)\]/);
+            const allowedStages = allowedMatch && allowedMatch[1]
+              ? allowedMatch[1].split(', ').filter(Boolean)
+              : [];
 
-          setTransitionBlocked({
-            opportunityTitle: targetOpp.title,
-            opportunityType: targetOpp.type,
-            fromStage: sourceStage,
-            toStage: destStage,
-            allowedStages,
-            pendingOpp: targetOpp,
-            prevOpps,
-          });
+            setTransitionBlocked({
+              opportunityTitle: targetOpp.title,
+              opportunityType: targetOpp.type,
+              fromStage: sourceStage,
+              toStage: destStage,
+              allowedStages,
+              pendingOpp: targetOpp,
+              prevOpps,
+            });
+          } else {
+            console.error('Server error during transition update:', err);
+            alert(`Update failed: ${err.error || 'Unknown server error'}`);
+          }
           return;
         }
       } catch (error) {
