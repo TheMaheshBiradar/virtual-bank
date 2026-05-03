@@ -76,25 +76,25 @@ public class OpportunityController {
             updates.setDynamicFields(df);
         }
 
-        // Extract activities — only new ones (those without a numeric id)
+        // Extract activities — full array sync (supports add, edit, delete)
         if (body.containsKey("activities") && body.get("activities") instanceof List) {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> rawActivities = (List<Map<String, Object>>) body.get("activities");
-            List<com.salesdynamics360.api.model.Activity> newActivities = new ArrayList<>();
+            List<com.salesdynamics360.api.model.Activity> allActivities = new ArrayList<>();
             for (Map<String, Object> a : rawActivities) {
+                com.salesdynamics360.api.model.Activity activity = new com.salesdynamics360.api.model.Activity();
                 Object aid = a.get("id");
-                // Only include new activities (null id or non-numeric string id from frontend)
-                if (aid == null || (aid instanceof String && !((String) aid).matches("\\d+"))) {
-                    com.salesdynamics360.api.model.Activity activity = new com.salesdynamics360.api.model.Activity();
-                    activity.setType((String) a.get("type"));
-                    activity.setNotes((String) a.get("notes"));
-                    activity.setDate((String) a.get("date"));
-                    newActivities.add(activity);
+                // Preserve numeric IDs (existing entries), null out string IDs (new from frontend)
+                if (aid instanceof Number) {
+                    activity.setId(((Number) aid).longValue());
                 }
+                // id stays null for new entries → JPA will auto-generate
+                activity.setType((String) a.get("type"));
+                activity.setNotes((String) a.get("notes"));
+                activity.setDate((String) a.get("date"));
+                allActivities.add(activity);
             }
-            if (!newActivities.isEmpty()) {
-                updates.setActivities(newActivities);
-            }
+            updates.setActivities(allActivities);
         }
 
         // Let service handle the update (it manages history server-side)

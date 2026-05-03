@@ -56,13 +56,10 @@ public class OpportunityService {
             existing.getDynamicFields().putAll(updates.getDynamicFields());
         }
 
-        // Merge activities: only add genuinely new ones (those with null id)
+        // Full activity sync: replace the entire list (supports add, edit, delete)
         if (updates.getActivities() != null) {
-            for (Activity incoming : updates.getActivities()) {
-                if (incoming.getId() == null) {
-                    existing.getActivities().add(incoming);
-                }
-            }
+            existing.getActivities().clear();
+            existing.getActivities().addAll(updates.getActivities());
         }
 
         calculateScore(existing);
