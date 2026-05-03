@@ -29,8 +29,8 @@ Browser (React/Vite)
       ▼
 Node.js Express Server (backend/server.ts)
       ├── GET  /api/metadata/schema   → Hardcoded schema (types, stages, users)
-      ├── GET  /api/clients           → Sequelize → SQLite (sales-h2.db)
-      ├── GET  /api/opportunities     → Sequelize → SQLite (enriched with client data)
+      ├── GET  /api/clients           → Spring Data JPA → H2 (H2 Database)
+      ├── GET  /api/opportunities     → Spring Data JPA → H2 (enriched with client data)
       ├── POST /api/opportunities     → Create
       ├── PUT  /api/opportunities/:id → Update + history append
       └── DELETE /api/opportunities/:id → Delete
@@ -38,7 +38,7 @@ Node.js Express Server (backend/server.ts)
 Vite Dev Middleware (integrated into same Node process)
       └── Serves frontend SPA from /frontend/src
 
-SQLite Database (backend/sales-h2.db)
+H2 Database (backend/H2 Database)
       ├── clients table
       └── opportunities table
 ```
@@ -525,7 +525,7 @@ Before opening a PR, verify:
 - [ ] Stage transitions are validated against `allowedTransitions` before calling the API
 - [ ] History entries are recorded for all state changes (`STATUS_CHANGE`, `EDIT`, `ACTIVITY`)
 - [ ] New AI features are gated with `can('VIEW_INSIGHTS')`
-- [ ] New type-specific opportunity fields are added to both `database.ts` (Sequelize model) and `server.ts` (metadata schema + API handlers)
+- [ ] New type-specific opportunity fields are added to both `database.ts` (Spring Data JPA model) and `server.ts` (metadata schema + API handlers)
 - [ ] New components consume data from Context (not prop-drilling more than 2 levels)
 - [ ] No hardcoded `user.role` checks anywhere in new code
 - [ ] The spec (this file) is updated if the new feature changes data flow

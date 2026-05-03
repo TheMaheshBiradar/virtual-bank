@@ -28,7 +28,7 @@ The core value proposition of the platform is the **Two-Stage Scoring Orchestrat
 ---
 
 ## 3. Data Schema & Persistence
-We utilize **Sequelize ORM with SQLite** for high-performance local state management.
+We utilize **Spring Data JPA ORM with H2** for high-performance local state management.
 
 ### Key Models:
 *   **`Opportunity`**: The primary entity. Contains flexible `activities` and `history` JSON blobs to support heterogeneous deal types (Sales vs. Product).
