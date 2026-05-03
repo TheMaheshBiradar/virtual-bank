@@ -4,7 +4,9 @@ import com.salesdynamics360.api.model.*;
 import com.salesdynamics360.api.repository.OpportunityRepository;
 import com.salesdynamics360.api.repository.TypeMetadataRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class OpportunityService {
@@ -25,6 +27,7 @@ public class OpportunityService {
         return repository.save(opportunity);
     }
 
+    @Transactional
     public Opportunity update(String id, Opportunity updates) {
         Opportunity existing = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Opportunity not found"));
@@ -56,14 +59,57 @@ public class OpportunityService {
             existing.getDynamicFields().putAll(updates.getDynamicFields());
         }
 
-        // Full activity sync: replace the entire list (supports add, edit, delete)
+        // Full activity sync: properly merge to avoid Hibernate orphan conflicts
         if (updates.getActivities() != null) {
-            existing.getActivities().clear();
-            existing.getActivities().addAll(updates.getActivities());
+            syncActivities(existing, updates.getActivities());
         }
 
         calculateScore(existing);
         return repository.save(existing);
+    }
+
+    /**
+     * Properly sync the activity list to avoid Hibernate's
+     * "A collection with cascade=all-delete-orphan was no longer referenced" error.
+     * 
+     * Strategy:
+     *  1. Remove activities no longer present in the incoming list
+     *  2. Update activities that exist in both lists
+     *  3. Add new activities (those with null id)
+     */
+    private void syncActivities(Opportunity existing, List<Activity> incoming) {
+        List<Activity> currentList = existing.getActivities();
+
+        // Collect incoming IDs (those that are non-null = existing entries)
+        Set<Long> incomingIds = incoming.stream()
+                .map(Activity::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 1. Remove activities that are no longer in the incoming list
+        currentList.removeIf(a -> a.getId() != null && !incomingIds.contains(a.getId()));
+
+        // 2. Update existing activities in-place
+        Map<Long, Activity> currentById = currentList.stream()
+                .filter(a -> a.getId() != null)
+                .collect(Collectors.toMap(Activity::getId, a -> a));
+
+        for (Activity inc : incoming) {
+            if (inc.getId() != null && currentById.containsKey(inc.getId())) {
+                // Update in-place (same managed entity, no detach/reattach)
+                Activity current = currentById.get(inc.getId());
+                current.setType(inc.getType());
+                current.setNotes(inc.getNotes());
+                current.setDate(inc.getDate());
+            }
+        }
+
+        // 3. Add new activities (null id = frontend-generated)
+        for (Activity inc : incoming) {
+            if (inc.getId() == null) {
+                currentList.add(inc);
+            }
+        }
     }
 
     private void calculateScore(Opportunity opp) {
