@@ -43,6 +43,9 @@ public class Opportunity {
     private Integer riskScore = 30;
     private String recommendation = "Awaiting analysis...";
 
+    // Client linkage
+    private String clientId;
+
     public Opportunity() {}
 
     @PrePersist
@@ -91,4 +94,6 @@ public class Opportunity {
     public void setRiskScore(Integer riskScore) { this.riskScore = riskScore; }
     public String getRecommendation() { return recommendation; }
     public void setRecommendation(String recommendation) { this.recommendation = recommendation; }
+    public String getClientId() { return clientId; }
+    public void setClientId(String clientId) { this.clientId = clientId; }
 }

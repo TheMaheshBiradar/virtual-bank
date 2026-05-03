@@ -46,6 +46,7 @@ public class OpportunityService {
         if (updates.getTitle() != null) existing.setTitle(updates.getTitle());
         if (updates.getOwnerAlias() != null) existing.setOwnerAlias(updates.getOwnerAlias());
         if (updates.getPriority() != null) existing.setPriority(updates.getPriority());
+        if (updates.getClientId() != null) existing.setClientId(updates.getClientId());
         if (updates.getDynamicFields() != null) {
             existing.getDynamicFields().putAll(updates.getDynamicFields());
         }

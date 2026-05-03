@@ -143,6 +143,7 @@ public class DataInitializer {
 
         // 5. Initialize Opportunities (with clientId links)
         Opportunity opp1 = new Opportunity();
+        opp1.setClientId("C1000");
         opp1.setType(OpportunityType.SALES);
         opp1.setTitle("Global Equities Expansion");
         opp1.setOwnerAlias("AJ");
@@ -159,6 +160,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp2 = new Opportunity();
+        opp2.setClientId("C1001");
         opp2.setType(OpportunityType.SALES);
         opp2.setTitle("FX Derivatives Mandate");
         opp2.setOwnerAlias("MN");
@@ -176,6 +178,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp3 = new Opportunity();
+        opp3.setClientId("C1002");
         opp3.setType(OpportunityType.SALES);
         opp3.setTitle("Private Credit Allocation");
         opp3.setOwnerAlias("AD");
@@ -189,6 +192,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp4 = new Opportunity();
+        opp4.setClientId("C1008");
         opp4.setType(OpportunityType.SALES);
         opp4.setTitle("Structured Notes Programme");
         opp4.setOwnerAlias("SR");
@@ -206,6 +210,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp5 = new Opportunity();
+        opp5.setClientId("C1003");
         opp5.setType(OpportunityType.TAGGING);
         opp5.setTitle("Tier-1 GWM Onboarding");
         opp5.setOwnerAlias("SK");
@@ -219,6 +224,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp6 = new Opportunity();
+        opp6.setClientId("C1000");
         opp6.setType(OpportunityType.TAGGING);
         opp6.setTitle("UHNW ESG Relationship Tag");
         opp6.setOwnerAlias("AJ");
@@ -232,6 +238,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp7 = new Opportunity();
+        opp7.setClientId("C1004");
         opp7.setType(OpportunityType.PRODUCT);
         opp7.setTitle("Lombard Loan Automation");
         opp7.setOwnerAlias("WL");
@@ -249,6 +256,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp8 = new Opportunity();
+        opp8.setClientId("C1005");
         opp8.setType(OpportunityType.PRODUCT);
         opp8.setTitle("Real-Time P&L Dashboard");
         opp8.setOwnerAlias("SK");
@@ -262,6 +270,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp9 = new Opportunity();
+        opp9.setClientId("C1010");
         opp9.setType(OpportunityType.PRODUCT);
         opp9.setTitle("AI-Assisted KYC Review");
         opp9.setOwnerAlias("SR");
@@ -275,6 +284,7 @@ public class DataInitializer {
         )));
 
         Opportunity opp10 = new Opportunity();
+        opp10.setClientId("C1006");
         opp10.setType(OpportunityType.SALES);
         opp10.setTitle("Emerging Market Bond Portfolio");
         opp10.setOwnerAlias("MN");
