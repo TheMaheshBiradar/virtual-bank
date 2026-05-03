@@ -133,7 +133,9 @@ public class DataInitializer {
             c.setRiskTolerance(risks[i % 3]);
             c.setLastContact(Instant.now().minusSeconds(rng.nextInt(10000000)).toString());
             c.setHealth(i % 15 == 0 ? "AT_RISK" : i % 5 == 0 ? "NEUTRAL" : "HEALTHY");
-            c.setAvatar("https://i.pravatar.cc/150?u=C" + (1000 + i));
+            String encodedName = c.getName().replace(" ", "+");
+            String[] bgColors = {"0D8ABC","E91E63","9C27B0","673AB7","3F51B5","009688","FF5722","795548","607D8B","2196F3"};
+            c.setAvatar("https://ui-avatars.com/api/?name=" + encodedName + "&size=150&background=" + bgColors[i % 10] + "&color=fff&bold=true");
             c.setAddress(addresses[i % 20]);
             clients.add(c);
         }
