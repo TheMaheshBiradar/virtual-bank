@@ -10,17 +10,20 @@ import java.util.*;
 @Service
 public class DataInitializer {
     private final OpportunityRepository opportunityRepository;
+    private final OpportunityService opportunityService;
     private final TypeMetadataRepository typeMetadataRepository;
     private final AppUserRepository appUserRepository;
     private final StageMetadataRepository stageMetadataRepository;
     private final ClientRepository clientRepository;
 
     public DataInitializer(OpportunityRepository opportunityRepository,
+                           OpportunityService opportunityService,
                            TypeMetadataRepository typeMetadataRepository,
                            AppUserRepository appUserRepository,
                            StageMetadataRepository stageMetadataRepository,
                            ClientRepository clientRepository) {
         this.opportunityRepository = opportunityRepository;
+        this.opportunityService = opportunityService;
         this.typeMetadataRepository = typeMetadataRepository;
         this.appUserRepository = appUserRepository;
         this.stageMetadataRepository = stageMetadataRepository;
@@ -282,6 +285,9 @@ public class DataInitializer {
                 "estimatedCloseDate", "2025-05-20"
         )));
 
-        opportunityRepository.saveAll(Arrays.asList(opp1, opp2, opp3, opp4, opp5, opp6, opp7, opp8, opp9, opp10));
+        // Save through OpportunityService so the heuristic scoring engine runs on each
+        for (Opportunity opp : Arrays.asList(opp1, opp2, opp3, opp4, opp5, opp6, opp7, opp8, opp9, opp10)) {
+            opportunityService.save(opp);
+        }
     }
 }
